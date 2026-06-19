@@ -3,6 +3,7 @@ langchain
 langgraph
 langchain-groq
 slack-bolt
+aiohttp
 uvicorn
 python-dotenv
 mcp
