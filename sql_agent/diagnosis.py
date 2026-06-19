@@ -2,16 +2,16 @@ from graph.state import LiveAgentState
 import sqlite3
 
 def diagnosis_agent(state: LiveAgentState):
-    """Node 1: Evaluates operational database incidents for stuck orders."""
-    print("\n🔍 [Node 1] Diagnosing operational database incident...")
+    """Node 1: Evaluates operational database incidents dynamically based on order schema."""
+    print("\n🔍 [Node 1] Dynamically diagnosing operational database incident...")
 
     order_id = state.get("order_id")
 
-    conn = sqlite3.connect("company.db")
+
+    conn = sqlite3.connect("/data/company.db")
     cursor = conn.cursor()
 
-    # Verify if this is an existing operational order issue
-    cursor.execute("SELECT status, warehouse_id from orders where order_id=?", (order_id,))
+    cursor.execute("SELECT status, warehouse_id, item_name FROM orders WHERE order_id = ?", (order_id,))
     order = cursor.fetchone()
 
     if order is None:
@@ -19,13 +19,28 @@ def diagnosis_agent(state: LiveAgentState):
         proposed_query = "-- No valid remediation operation can be formulated."
         conn.close()
     else:
-        # Trace stuck status dependencies
-        cursor.execute("SELECT warehouse_id, stock_count FROM inventory WHERE item_name = 'Premium Shoes' AND stock_count > 0")
+        current_status, current_warehouse, item_name = order
+        
+
+        cursor.execute("""
+            SELECT warehouse_id, stock_count 
+            FROM inventory 
+            WHERE item_name = ? AND stock_count > 0 AND warehouse_id != ?
+            LIMIT 1
+        """, (item_name, current_warehouse))
+
         alternative = cursor.fetchone()
         conn.close()
         
-        issue = f"Order #{order_id} is stuck in '{order[0]}' status at Warehouse {order[1]} due to 0 inventory."
-        proposed_query = f"UPDATE orders SET warehouse_id = {alternative[0] if alternative else order[1]}, status = 'Ready' WHERE order_id = {order_id};"
+
+        issue = f"Order #{order_id} ('{item_name}') is stuck in '{current_status}' status at Warehouse {current_warehouse} due to 0 inventory."
+        
+        if alternative:
+            proposed_query = f"UPDATE orders SET warehouse_id = {alternative[0]}, status = 'Ready' WHERE order_id = {order_id};"
+            issue += f" Found alternative stock at Warehouse {alternative[0]}."
+        else:
+            proposed_query = f"-- No alternative stock found for '{item_name}' in any other warehouse."
+            issue += f" CRITICAL: Out of stock globally for '{item_name}'."
 
     print(f"   ↳ Incident Diagnosis: {issue}")
     print(f"   ↳ Remediation Query: {proposed_query}")
