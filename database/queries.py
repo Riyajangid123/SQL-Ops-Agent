@@ -1,11 +1,13 @@
 import sqlite3
 
 def setup_mock_database():
-    """Create a local Sqlite database representing an e-commerce platform"""
-
+    """Creates a local SQLite database representing an e-commerce platform inside /tmp."""
+    
+    print("🗄️ [Setup Script] Spawning standalone database build sequence at /tmp/company.db...")
     conn = sqlite3.connect("/tmp/company.db")
     cursor = conn.cursor()
 
+   
     cursor.execute("DROP TABLE IF EXISTS orders;")
     cursor.execute("DROP TABLE IF EXISTS inventory;")
 
@@ -27,7 +29,6 @@ def setup_mock_database():
     """)
 
     cursor.execute("INSERT INTO orders VALUES (4092, 'Alice Smith', 'Limbo', 1, 'Premium Shoes');")
-    
     cursor.execute("""
         INSERT OR IGNORE INTO orders (order_id, status, warehouse_id, item_name) 
         VALUES 
@@ -37,16 +38,21 @@ def setup_mock_database():
             (1004, 'Stuck', 3, 'Wireless Headphones');
     """)
 
+
     cursor.execute("""
         INSERT OR IGNORE INTO inventory (item_name, warehouse_id, stock_count)
         VALUES 
-            ('Premium Shoes', 1, 0),   -- Out of stock
-            ('Premium Shoes', 2, 50),  -- Stock available
-            ('Premium Shoes', 3, 10),  -- Stock available
+            ('Premium Shoes', 1, 0),   -- Out of stock at current location
+            ('Premium Shoes', 2, 50),  -- Alternative location has stock
+            ('Premium Shoes', 3, 10),  
             
-            ('Wireless Headphones', 2, 0),  -- Out of stock
-            ('Wireless Headphones', 1, 35)  -- Stock available
+            ('Wireless Headphones', 2, 0),  -- Out of stock at current location
+            ('Wireless Headphones', 1, 35)  -- Alternative location has stock
     """)
     
     conn.commit()
     conn.close()
+    print("✅ [Setup Script] Database build completed successfully.")
+
+if __name__ == "__main__":
+    setup_mock_database()

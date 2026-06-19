@@ -22,7 +22,8 @@ mcp_context = {}
 
 def ensure_database_exists():
     """Guarantees the target directory and SQLite file exist before any request hits the state machine."""
-    db_path = "/temp/company.db"
+    # 🎯 FIX: Changed /temp/company.db to /tmp/company.db
+    db_path = "/tmp/company.db"
     dir_path = os.path.dirname(db_path)
     
     print(f"📦 [Database Setup] Verifying data path: {db_path}")
