@@ -212,12 +212,19 @@ async def handle_slack_rejection_button(ack, body, say):
 @app.post("/slack/events")
 async def slack_events_endpoint(request: Request):
     body_bytes = await request.body()
+    body_str = body_bytes.decode("utf-8")
+    
     try:
-        payload = json.loads(body_bytes.decode("utf-8"))
+        if body_str.startswith("payload="):
+            from urllib.parse import unquote_plus
+            payload_json = json.loads(unquote_plus(body_str.split("payload=")[1]))
+        else:
+            payload_json = json.loads(body_str)
     except Exception:
-        payload = {}
+        payload_json = {}
 
-    if payload.get("type") == "url_verification":
-        return PlainTextResponse(content=payload.get("challenge"))
+    if payload_json.get("type") == "url_verification":
+        return PlainTextResponse(content=payload_json.get("challenge"))
+
 
     return await handler.handle(request)
