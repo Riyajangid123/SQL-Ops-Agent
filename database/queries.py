@@ -27,6 +27,24 @@ def setup_mock_database():
     cursor.execute("INSERT INTO orders VALUES (4092, 'Alice Smith', 'Limbo', 1);")
     cursor.execute("INSERT INTO inventory VALUES (1, 'Premium Shoes', 0);")  
     cursor.execute("INSERT INTO inventory VALUES (3, 'Premium Shoes', 15);") 
+
+
+    cursor.execute("""
+        INSERT OR IGNORE INTO orders (order_id, status, warehouse_id) 
+        VALUES 
+            (1001, 'Stuck', 1),
+            (1002, 'Stuck', 2),
+            (1003, 'Processing', 1),
+            (1004, 'Stuck', 3);
+    """)
+
+    cursor.execute("""
+        INSERT OR IGNORE INTO inventory (item_name, warehouse_id, stock_count)
+        VALUES 
+            ('Premium Shoes', 1, 0),   -- Warehouse 1 is out of stock (causes the bug!)
+            ('Premium Shoes', 2, 50),  -- Warehouse 2 has stock available!
+            ('Premium Shoes', 3, 10);  -- Warehouse 3 has stock available!
+    """)
     
     conn.commit()
     conn.close()
