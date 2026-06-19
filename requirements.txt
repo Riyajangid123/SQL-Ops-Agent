@@ -6,8 +6,6 @@ sqlite3
 slack_bolt
 uvicorn
 dotenv
-pyngrok
-aiohttp
 mcp
 langchain-mcp-adapters
 pywin32
