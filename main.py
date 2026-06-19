@@ -22,21 +22,18 @@ mcp_context = {}
 
 def ensure_database_exists():
     """Guarantees the target directory and SQLite file exist before any request hits the state machine."""
-    db_path = "/data/company.db"
+    db_path = "/temp/company.db"
     dir_path = os.path.dirname(db_path)
     
     print(f"📦 [Database Setup] Verifying data path: {db_path}")
     
-    # 1. Create the folder if Render container hasn't created it yet
     if not os.path.exists(dir_path):
         print(f"📁 [Database Setup] Directory {dir_path} missing. Creating it dynamically...")
         os.makedirs(dir_path, exist_ok=True)
         
-    # 2. Automatically build and seed schema if the file is completely missing
     if not os.path.exists(db_path):
         print("🗄️ [Database Setup] Database file missing! Building and seeding mock data...")
         try:
-            # Dynamically run your setup code here to protect runtime
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             
@@ -57,7 +54,6 @@ def ensure_database_exists():
                 );
             """)
             
-            # Fresh initial seed parameters
             cursor.execute("INSERT OR IGNORE INTO orders VALUES (4092, 'Alice Smith', 'Limbo', 1, 'Premium Shoes');")
             cursor.execute("""
                 INSERT OR IGNORE INTO orders (order_id, status, warehouse_id, item_name) 
@@ -89,7 +85,6 @@ async def lifespan(app: FastAPI):
     """Manages the application lifecycle, database generation, and boots the local Python MCP server context."""
     print("\n⚙️ [Lifespan] Initializing system environments...")
     
-    # Run our verification safety switch before doing anything else
     ensure_database_exists()
 
     print("🔌 [Lifespan] Establishing Model Context Protocol (MCP) client tunnel...")
@@ -115,7 +110,7 @@ async def lifespan(app: FastAPI):
         mcp_context["tools"] = []
         yield
 
-# Register the lifespan framework context
+
 app = FastAPI(lifespan=lifespan)
 
 slack_app = AsyncApp(
