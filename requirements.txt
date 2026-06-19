@@ -2,10 +2,8 @@ fastapi
 langchain
 langgraph
 langchain-groq
-sqlite3
-slack_bolt
+slack-bolt
 uvicorn
-dotenv
+python-dotenv
 mcp
 langchain-mcp-adapters
-pywin32
