@@ -7,7 +7,8 @@ def action_execution_node(state:LiveAgentState):
 
     if state["status"]=="approved":
         print("   ↳ Execution Approved! Writing mutations directly to SQL...")
-        conn = sqlite3.connect("/data/company.db")
+    
+        conn = sqlite3.connect("/tmp/company.db")
         cursor = conn.cursor()
         cursor.execute(state["fix_query"])
         conn.commit()

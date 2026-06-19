@@ -8,7 +8,7 @@ def diagnosis_agent(state: LiveAgentState):
     order_id = state.get("order_id")
 
 
-    conn = sqlite3.connect("/data/company.db")
+    conn = sqlite3.connect("/tmp/company.db")
     cursor = conn.cursor()
 
     cursor.execute("SELECT status, warehouse_id, item_name FROM orders WHERE order_id = ?", (order_id,))

@@ -3,7 +3,7 @@ import sqlite3
 def setup_mock_database():
     """Create a local Sqlite database representing an e-commerce platform"""
 
-    conn = sqlite3.connect("/data/company.db")
+    conn = sqlite3.connect("/tmp/company.db")
     cursor = conn.cursor()
 
     cursor.execute("DROP TABLE IF EXISTS orders;")

@@ -2,6 +2,7 @@ import os
 import json
 import asyncio
 import re
+import sqlite3
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
@@ -16,14 +17,80 @@ from langchain_mcp_adapters.tools import load_mcp_tools
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+# Global container to keep active tools across execution loops
 mcp_context = {}
 
-from langchain_mcp_adapters.tools import load_mcp_tools
+def ensure_database_exists():
+    """Guarantees the target directory and SQLite file exist before any request hits the state machine."""
+    db_path = "/data/company.db"
+    dir_path = os.path.dirname(db_path)
+    
+    print(f"📦 [Database Setup] Verifying data path: {db_path}")
+    
+    # 1. Create the folder if Render container hasn't created it yet
+    if not os.path.exists(dir_path):
+        print(f"📁 [Database Setup] Directory {dir_path} missing. Creating it dynamically...")
+        os.makedirs(dir_path, exist_ok=True)
+        
+    # 2. Automatically build and seed schema if the file is completely missing
+    if not os.path.exists(db_path):
+        print("🗄️ [Database Setup] Database file missing! Building and seeding mock data...")
+        try:
+            # Dynamically run your setup code here to protect runtime
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS orders (
+                    order_id INTEGER PRIMARY KEY,
+                    customer_name TEXT,
+                    status TEXT,
+                    warehouse_id INTEGER,
+                    item_name TEXT
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS inventory (
+                    warehouse_id INTEGER,
+                    item_name TEXT,
+                    stock_count INTEGER
+                );
+            """)
+            
+            # Fresh initial seed parameters
+            cursor.execute("INSERT OR IGNORE INTO orders VALUES (4092, 'Alice Smith', 'Limbo', 1, 'Premium Shoes');")
+            cursor.execute("""
+                INSERT OR IGNORE INTO orders (order_id, status, warehouse_id, item_name) 
+                VALUES 
+                    (1001, 'Stuck', 1, 'Premium Shoes'),
+                    (1002, 'Stuck', 2, 'Wireless Headphones'),
+                    (1003, 'Processing', 1, 'Premium Shoes'),
+                    (1004, 'Stuck', 3, 'Wireless Headphones');
+            """)
+            cursor.execute("""
+                INSERT OR IGNORE INTO inventory (item_name, warehouse_id, stock_count)
+                VALUES 
+                    ('Premium Shoes', 1, 0),
+                    ('Premium Shoes', 2, 50),
+                    ('Premium Shoes', 3, 10),
+                    ('Wireless Headphones', 2, 0),
+                    ('Wireless Headphones', 1, 35);
+            """)
+            conn.commit()
+            conn.close()
+            print("✅ [Database Setup] Seeding complete. Persistent schema active.")
+        except Exception as db_err:
+            print(f"❌ [Database Setup] Automated fallback construction failed: {str(db_err)}")
+    else:
+        print("✅ [Database Setup] Verified! Database file found intact.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Manages the application lifecycle and mounts the local Python MCP server context."""
+    """Manages the application lifecycle, database generation, and boots the local Python MCP server context."""
     print("\n⚙️ [Lifespan] Initializing system environments...")
+    
+    # Run our verification safety switch before doing anything else
+    ensure_database_exists()
 
     print("🔌 [Lifespan] Establishing Model Context Protocol (MCP) client tunnel...")
     try:
@@ -34,7 +101,6 @@ async def lifespan(app: FastAPI):
         
         async with stdio_client(server_params) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
-
                 await session.initialize()
                 print("⚡ [Lifespan] MCP Session Handshake completed successfully.")
                 
@@ -49,6 +115,7 @@ async def lifespan(app: FastAPI):
         mcp_context["tools"] = []
         yield
 
+# Register the lifespan framework context
 app = FastAPI(lifespan=lifespan)
 
 slack_app = AsyncApp(
@@ -72,7 +139,6 @@ async def handle_initial_mention(event, say):
 
     dynamic_order_id = int(order_id_match.group())
     thread_config = {"configurable": {"thread_id": thread_ts}}
-    
     
     initial_input = {
         "order_id": dynamic_order_id,
@@ -144,7 +210,7 @@ async def handle_slack_rejection_button(ack, body, say):
     
     await say(text="🛑 *Operation rejected by human supervisor. Aborting operation cleanly.*", thread_ts=thread_id)
     
-    async for event_update in agent_brain.astream(Command(resume="rejected"), thread_config, stream_mode="whitespaces"):
+    async for event_update in agent_brain.astream(Command(resume="rejected"), thread_config, stream_mode="updates"):
         pass
 
 @app.post("/slack/events")

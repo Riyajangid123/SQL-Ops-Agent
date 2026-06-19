@@ -1,7 +1,6 @@
 # mcp_server.py
 from mcp.server.fastmcp import FastMCP
 
-# Initialize the FastMCP Server named "RemediationTools"
 mcp = FastMCP("RemediationTools")
 
 @mcp.tool()
