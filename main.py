@@ -12,10 +12,9 @@ from langgraph.types import Command
 from langgraph.errors import GraphInterrupt
 from graph.workflow import agent_brain 
 
+from langchain_mcp_adapters.tools import load_mcp_tools
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from langchain_mcp_adapters.tools import convert_mcp_to_langchain_tools
-
 
 mcp_context = {}
 
