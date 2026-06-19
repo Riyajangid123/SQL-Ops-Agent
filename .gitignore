@@ -1,0 +1,20 @@
+# Environment Variables & Secrets (CRITICAL)
+.env
+*.env
+secrets.py
+
+# Python Virtual Environment
+venv/
+ENV/
+env/
+.venv/
+
+# Python caching files (keeps your repo clean)
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Local Operating System Files
+.DS_Store
+Thumbs.db
