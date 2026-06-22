@@ -17,12 +17,10 @@ from langchain_mcp_adapters.tools import load_mcp_tools
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-# Global container to keep active tools across execution loops
 mcp_context = {}
 
 def ensure_database_exists():
     """Guarantees the target directory and SQLite file exist before any request hits the state machine."""
-    # 🎯 FIX: Changed /temp/company.db to /tmp/company.db
     db_path = "/tmp/company.db"
     dir_path = os.path.dirname(db_path)
     
@@ -85,7 +83,6 @@ def ensure_database_exists():
 async def lifespan(app: FastAPI):
     """Manages the application lifecycle, database generation, and boots the local Python MCP server context."""
     print("\n⚙️ [Lifespan] Initializing system environments...")
-    
     ensure_database_exists()
 
     print("🔌 [Lifespan] Establishing Model Context Protocol (MCP) client tunnel...")
@@ -120,9 +117,13 @@ slack_app = AsyncApp(
 )
 handler = AsyncSlackRequestHandler(slack_app)
 
-@slack_app.event("app_mention")
-async def handle_initial_mention(event, say):
-    """Catches initial user request from Slack, updates graph state variables, and watches for native interrupts."""
+
+async def respond_mention_instantly(ack):
+    """Acknowledge Slack immediately within 3 seconds to avoid event retries."""
+    await ack()
+
+async def process_mention_logic(event, say):
+    """Heavy LangGraph execution runs safely in the background."""
     user_text = event.get("text")
     thread_ts = event.get("ts") 
     user_question = user_text.split(">")[-1].strip()
@@ -180,11 +181,18 @@ async def handle_initial_mention(event, say):
     except Exception as err:
         await say(text=f"❌ *System Error:* `{str(err)}`", thread_ts=thread_ts)
 
-@slack_app.action("approve_action")
-async def handle_slack_approval_button(ack, body, say):
-    """Catches approval click, updates the native interrupt value, and kicks off Node 3 execution."""
-    await ack() 
-    
+
+slack_app.event("app_mention")(ack=respond_mention_instantly, lazy=[process_mention_logic])
+
+
+
+
+async def respond_action_instantly(ack):
+    """Acknowledge button interactive component clicks immediately."""
+    await ack()
+
+async def handle_slack_approval_button(body, say):
+    """Catches approval click, updates native interrupt, resumes execution."""
     block_id = body["actions"][0]["block_id"]
     thread_id = block_id.split("approval_block_")[-1]
     thread_config = {"configurable": {"thread_id": thread_id}}
@@ -196,10 +204,8 @@ async def handle_slack_approval_button(ack, body, say):
     
     await say(text="🎯 *Database successfully synchronized!*", thread_ts=thread_id)
 
-@slack_app.action("reject_action")
-async def handle_slack_rejection_button(ack, body, say):
-    """Catches rejection click and safely alerts the graph to abort modifications."""
-    await ack()
+async def handle_slack_rejection_button(body, say):
+    """Catches rejection click and safely alerts the graph to abort."""
     block_id = body["actions"][0]["block_id"]
     thread_id = block_id.split("approval_block_")[-1]
     thread_config = {"configurable": {"thread_id": thread_id}}
@@ -208,6 +214,12 @@ async def handle_slack_rejection_button(ack, body, say):
     
     async for event_update in agent_brain.astream(Command(resume="rejected"), thread_config, stream_mode="updates"):
         pass
+
+
+slack_app.action("approve_action")(ack=respond_action_instantly, lazy=[handle_slack_approval_button])
+slack_app.action("reject_action")(ack=respond_action_instantly, lazy=[handle_slack_rejection_button])
+
+
 
 @app.post("/slack/events")
 async def slack_events_endpoint(request: Request):
@@ -226,5 +238,5 @@ async def slack_events_endpoint(request: Request):
     if payload_json.get("type") == "url_verification":
         return PlainTextResponse(content=payload_json.get("challenge"))
 
-
+    
     return await handler.handle(request)
