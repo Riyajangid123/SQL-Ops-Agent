@@ -52,6 +52,34 @@ def calculate_sla_deadline(status: str) -> str:
         return "⚠️ HIGH SLA: 2 hours remaining for re-routing."
     else:
         return "✅ STANDARD SLA: 24 hours remaining."
+    
+
+@mcp.tool()
+def execute_remediation_write(order_id: int, target_warehouse: int) -> str:
+    """Executes the database updates to route an order to a new warehouse and deduct inventory count safely."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT item_name FROM orders WHERE order_id = ?;", (order_id,))
+        row = cursor.fetchone()
+        if not row:
+            return f"❌ Order ID {order_id} not found."
+        item_name = row[0]
+        
+        cursor.execute("UPDATE orders SET warehouse_id = ?, status = 'Ready' WHERE order_id = ?;", (target_warehouse, order_id))
+        
+        cursor.execute("""
+            UPDATE inventory 
+            SET stock_count = MAX(0, stock_count - 1) 
+            WHERE item_name = ? AND warehouse_id = ?;
+        """, (item_name, target_warehouse))
+        
+        conn.commit()
+        conn.close()
+        return f"✅ Success! Order #{order_id} rerouted to Warehouse #{target_warehouse}. Inventory synchronized."
+    except Exception as e:
+        return f"❌ Database write operation failed: {str(e)}"
 
 
 if __name__ == "__main__":

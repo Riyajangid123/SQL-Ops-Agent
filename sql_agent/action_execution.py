@@ -1,47 +1,33 @@
+import re
 from graph.state import LiveAgentState
-import sqlite3 
 
 def action_execution_node(state: LiveAgentState):
-    """Node 3: Executes write actions conditionally and updates inventory quantities."""
-    print("\n⚡ [Node 3] Evaluating user response...")
+    """Node 3: Executes write actions safely by delegating everything to the MCP Tool Server."""
+    print("\n⚡ [Node 3] Evaluating user response and modifying backend context...")
 
+    from main import mcp_context
     human_choice = state.get("human_decision") or state.get("status")
 
     if human_choice == "approved":
-        print("   ↳ Execution Approved! Writing mutations directly to SQL...")
-    
-        conn = sqlite3.connect("/tmp/company.db")
-        cursor = conn.cursor()
+        print("   ↳ Execution Approved! Triggering mutation tool on MCP Server...")
         
         order_id = state["order_id"]
-        cursor.execute("SELECT item_name FROM orders WHERE order_id = ?", (order_id,))
-        item_row = cursor.fetchone()
         
-        cursor.execute(state["fix_query"])
-        
-        import re
         warehouse_match = re.search(r"warehouse_id\s*=\s*(\d+)", state["fix_query"])
+        target_warehouse = int(warehouse_match.group(1)) if warehouse_match else None
         
-        if warehouse_match and item_row:
-            target_warehouse = int(warehouse_match.group(1))
-            item_name = item_row[0]
-            
-            cursor.execute("""
-                UPDATE inventory 
-                SET stock_count = MAX(0, stock_count - 1) 
-                WHERE item_name = ? AND warehouse_id = ?
-            """, (item_name, target_warehouse))
-            print(f"📦 [Node 3] Deducted 1 unit of '{item_name}' from Warehouse {target_warehouse}.")
+        if not target_warehouse:
+            print("   ↳ ❌ Aborted: Could not determine valid target warehouse from state context.")
+            return {"action_execute": False}
 
-        conn.commit()
-
-        cursor.execute("SELECT status, warehouse_id FROM orders WHERE order_id = ?", (order_id,))
-        updated_order = cursor.fetchone()
-        conn.close()
+        mcp_result = mcp_context["tools"].execute_remediation_write(
+            order_id=order_id, 
+            target_warehouse=target_warehouse
+        )
         
-        print(f"   ↳ SUCCESS: Database Updated! New Order State: {updated_order}")
+        print(f"   ↳ [MCP Server Feedback] {mcp_result}")
         return {"action_execute": True}
         
     else:
-        print(f"   ↳ Execution REJECTED or ABORTED. Aborting operation cleanly.")
+        print(f"   ↳ Execution REJECTED or ABORTED. Safely terminating graph state.")
         return {"action_execute": False}

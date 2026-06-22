@@ -1,7 +1,7 @@
 from graph.state import LiveAgentState
 from langgraph.types import interrupt
 
-def human_approval_node(state:LiveAgentState):
+def human_approval_node(state: LiveAgentState):
     """Node 2: Pauses execution using LangGraph's native interrupt feature."""
     print("\n⏳ [Node 2] Pausing execution! Exposing approval options to human controller...")
 
@@ -12,5 +12,4 @@ def human_approval_node(state:LiveAgentState):
     }
 
     user_choice = interrupt(approval_payload)
-
     return {"status": user_choice}
