@@ -1,12 +1,12 @@
 import re
 import json
 from graph.state import LiveAgentState
-from main import mcp_context 
 
 def diagnosis_agent(state: LiveAgentState):
     """Node 1: Evaluates operational database incidents dynamically by calling external MCP tools."""
     print("\n🔍 [Node 1] Dynamically diagnosing operational database incident via MCP...")
 
+    from main import mcp_context
     
     order_id = state.get("order_id")
 
