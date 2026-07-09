@@ -19,7 +19,7 @@ def action_execution_node(state: LiveAgentState):
         target_warehouse = int(warehouse_match.group(1)) if warehouse_match else None
         
         if not target_warehouse:
-            print("   ↳ ❌ Aborted: Could not determine valid target warehouse from state context.")
+            print("   ↳ Aborted: Could not determine valid target warehouse from state context.")
             return {"action_execute": False}
 
         mcp_result = mcp_context["tools"].execute_remediation_write(

@@ -4,7 +4,7 @@ from graph.state import LiveAgentState
 
 def diagnosis_agent(state: LiveAgentState):
     """Node 1: Evaluates operational database incidents dynamically by calling external MCP tools."""
-    print("\n🔍 [Node 1] Dynamically diagnosing operational database incident via MCP...")
+    print("\n[Node 1] Dynamically diagnosing operational database incident via MCP...")
 
     from main import mcp_context
     

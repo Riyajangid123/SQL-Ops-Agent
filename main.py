@@ -13,25 +13,32 @@ from langgraph.types import Command
 from langgraph.errors import GraphInterrupt
 from graph.workflow import agent_brain 
 
-from langchain_mcp_adapters.tools import load_mcp_tools
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+# High-level clean MCP adapter
+from langchain_mcp_adapters.client import MultiServerMCPClient
 
 mcp_context = {}
+
+MCP_CONFIG = {
+    "remediation_server": {
+        "transport": "stdio",
+        "command": "python",
+        "args": ["mcp_server.py"]
+    }
+}
 
 def ensure_database_exists():
     """Guarantees the target directory and SQLite file exist before any request hits the state machine."""
     db_path = "/tmp/company.db"
     dir_path = os.path.dirname(db_path)
     
-    print(f"📦 [Database Setup] Verifying data path: {db_path}")
+    print(f"[Database Setup] Verifying data path: {db_path}")
     
     if not os.path.exists(dir_path):
-        print(f"📁 [Database Setup] Directory {dir_path} missing. Creating it dynamically...")
+        print(f"[Database Setup] Directory {dir_path} missing. Creating it dynamically...")
         os.makedirs(dir_path, exist_ok=True)
         
     if not os.path.exists(db_path):
-        print("🗄️ [Database Setup] Database file missing! Building and seeding mock data...")
+        print("[Database Setup] Database file missing! Building and seeding mock data...")
         try:
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
@@ -73,38 +80,34 @@ def ensure_database_exists():
             """)
             conn.commit()
             conn.close()
-            print("✅ [Database Setup] Seeding complete. Persistent schema active.")
+            print(" [Database Setup] Seeding complete. Persistent schema active.")
         except Exception as db_err:
-            print(f"❌ [Database Setup] Automated fallback construction failed: {str(db_err)}")
+            print(f"[Database Setup] Automated fallback construction failed: {str(db_err)}")
     else:
-        print("✅ [Database Setup] Verified! Database file found intact.")
+        print("[Database Setup] Verified! Database file found intact.")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Manages the application lifecycle, database generation, and boots the local Python MCP server context."""
-    print("\n⚙️ [Lifespan] Initializing system environments...")
+    """Manages the application lifecycle, database generation, and boots the unified Multi-Server MCP client."""
+    print("\n[Lifespan] Initializing system environments...")
     ensure_database_exists()
 
-    print("🔌 [Lifespan] Establishing Model Context Protocol (MCP) client tunnel...")
+    print("[Lifespan] Establishing Model Context Protocol (MCP) multi-server client tunnel...")
     try:
-        server_params = StdioServerParameters(
-            command="python",       
-            args=["mcp_server.py"]  
-        )
-        
-        async with stdio_client(server_params) as (read_stream, write_stream):
-            async with ClientSession(read_stream, write_stream) as session:
-                await session.initialize()
-                print("⚡ [Lifespan] MCP Session Handshake completed successfully.")
-                
-                langchain_mcp_tools = await load_mcp_tools(session)
-                mcp_context["tools"] = langchain_mcp_tools
-                print(f"📦 [Lifespan] Successfully bound {len(langchain_mcp_tools)} remote MCP tools.")
-                
-                yield
-                
+        async with MultiServerMCPClient(MCP_CONFIG) as client:
+            print("⚡ [Lifespan] MultiServerMCPClient connected and handshakes initialized.")
+            
+
+            langchain_mcp_tools = await client.get_tools()
+            mcp_context["tools"] = langchain_mcp_tools
+            
+            print(f"[Lifespan] Successfully bound {len(langchain_mcp_tools)} remote MCP tools dynamically.")
+            
+            yield
+            
     except Exception as mcp_err:
-        print(f"⚠️ [Lifespan] MCP setup failed: {str(mcp_err)}")
+        print(f"[Lifespan] Multi-Server MCP setup failed: {str(mcp_err)}")
         mcp_context["tools"] = []
         yield
 
@@ -142,12 +145,12 @@ async def process_mention_logic(event, say):
         "user_query": user_question
     }
 
-    await say(text=f"⚙️ *Consulting LangGraph State Machine for Order #{dynamic_order_id}...*", thread_ts=thread_ts)
+    await say(text=f"*Consulting LangGraph State Machine for Order #{dynamic_order_id}...*", thread_ts=thread_ts)
 
     try:
         async for event_update in agent_brain.astream(initial_input, thread_config, stream_mode="updates"):
             if "action_execute" in event_update:
-                await say(text="🎯 *Operation completed successfully on the database layer.*", thread_ts=thread_ts)
+                await say(text="*Operation completed successfully on the database layer.*", thread_ts=thread_ts)
 
         current_state = await agent_brain.aget_state(thread_config)
         
@@ -179,12 +182,10 @@ async def process_mention_logic(event, say):
             )
 
     except Exception as err:
-        await say(text=f"❌ *System Error:* `{str(err)}`", thread_ts=thread_ts)
+        await say(text=f"*System Error:* `{str(err)}`", thread_ts=thread_ts)
 
 
 slack_app.event("app_mention")(ack=respond_mention_instantly, lazy=[process_mention_logic])
-
-
 
 
 async def respond_action_instantly(ack):
@@ -197,12 +198,12 @@ async def handle_slack_approval_button(body, say):
     thread_id = block_id.split("approval_block_")[-1]
     thread_config = {"configurable": {"thread_id": thread_id}}
     
-    await say(text="🚀 *Approval received! Resuming LangGraph execution context...*", thread_ts=thread_id)
+    await say(text="*Approval received! Resuming LangGraph execution context...*", thread_ts=thread_id)
     
     async for event_update in agent_brain.astream(Command(resume="approved"), thread_config, stream_mode="updates"):
         pass
     
-    await say(text="🎯 *Database successfully synchronized!*", thread_ts=thread_id)
+    await say(text="*Database successfully synchronized!*", thread_ts=thread_id)
 
 async def handle_slack_rejection_button(body, say):
     """Catches rejection click and safely alerts the graph to abort."""
@@ -210,7 +211,7 @@ async def handle_slack_rejection_button(body, say):
     thread_id = block_id.split("approval_block_")[-1]
     thread_config = {"configurable": {"thread_id": thread_id}}
     
-    await say(text="🛑 *Operation rejected by human supervisor. Aborting operation cleanly.*", thread_ts=thread_id)
+    await say(text="*Operation rejected by human supervisor. Aborting operation cleanly.*", thread_ts=thread_id)
     
     async for event_update in agent_brain.astream(Command(resume="rejected"), thread_config, stream_mode="updates"):
         pass
@@ -218,7 +219,6 @@ async def handle_slack_rejection_button(body, say):
 
 slack_app.action("approve_action")(ack=respond_action_instantly, lazy=[handle_slack_approval_button])
 slack_app.action("reject_action")(ack=respond_action_instantly, lazy=[handle_slack_rejection_button])
-
 
 
 @app.post("/slack/events")
@@ -238,5 +238,4 @@ async def slack_events_endpoint(request: Request):
     if payload_json.get("type") == "url_verification":
         return PlainTextResponse(content=payload_json.get("challenge"))
 
-    
     return await handler.handle(request)
