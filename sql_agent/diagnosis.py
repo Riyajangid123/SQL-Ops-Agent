@@ -1,29 +1,46 @@
 import re
 from graph.state import LiveAgentState
 
+def extract_tool_text(result) -> str:
+    """Normalizes MCP tool outputs (string or list of content blocks) into a plain string."""
+    if isinstance(result, str):
+        return result
+    if isinstance(result, list):
+        parts = []
+        for item in result:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict) and "text" in item:
+                parts.append(item["text"])
+            elif hasattr(item, "text"):
+                parts.append(item.text)
+            else:
+                parts.append(str(item))
+        return "\n".join(parts)
+    return str(result)
+
 
 async def diagnosis_agent(state: LiveAgentState):
+    """Node 1: Evaluates operational database incidents dynamically by calling external MCP tools."""
     print("\n[Node 1] Dynamically diagnosing operational database incident via MCP...")
 
     from main import mcp_context
 
     tools_list = mcp_context.get("tools", [])
-    
-    print(f" ↳ [Debug] Available tools in mcp_context: {[getattr(t, 'name', str(t)) for t in tools_list]}")
-
     if not tools_list:
-        raise RuntimeError("mcp_context['tools'] is empty! The MCP Client lifespan context has not initialized tools yet.")
+        raise RuntimeError("mcp_context['tools'] is empty! Check lifespan initialization.")
 
     tools = {t.name: t for t in tools_list}
-
     fetch_tool = tools.get("fetch_order_details") or next((t for t in tools_list if "fetch_order_details" in t.name), None)
 
     if not fetch_tool:
-        raise KeyError(f"Tool 'fetch_order_details' not found. Registered tools: {list(tools.keys())}")
+        raise KeyError(f"Tool 'fetch_order_details' not found in MCP context. Available: {list(tools.keys())}")
 
     order_id = state.get("order_id")
-    
-    order_info_str = await fetch_tool.ainvoke({"order_id": order_id})
+
+    # 1. Invoke tool and safely unpack list content into string
+    order_info_raw = await fetch_tool.ainvoke({"order_id": order_id})
+    order_info_str = extract_tool_text(order_info_raw)
     print(f"   ↳ [MCP Output] {order_info_str}")
 
     if "not found" in order_info_str.lower() or "error" in order_info_str.lower():
@@ -40,12 +57,14 @@ async def diagnosis_agent(state: LiveAgentState):
     current_warehouse = int(warehouse_match.group(1)) if warehouse_match else 1
     item_name = item_match.group(1).strip() if item_match else "Premium Shoes"
 
-    # 3. Invoke 'check_item_inventory'
-    inventory_str = await tools["check_item_inventory"].ainvoke({"item_name": item_name})
+    # 2. Invoke check_item_inventory
+    inventory_raw = await tools["check_item_inventory"].ainvoke({"item_name": item_name})
+    inventory_str = extract_tool_text(inventory_raw)
     print(f"   ↳ [MCP Output] {inventory_str}")
 
-    # 4. Invoke 'calculate_sla_deadline'
-    sla_str = await tools["calculate_sla_deadline"].ainvoke({"status": current_status})
+    # 3. Invoke calculate_sla_deadline
+    sla_raw = await tools["calculate_sla_deadline"].ainvoke({"status": current_status})
+    sla_str = extract_tool_text(sla_raw)
     print(f"   ↳ [MCP Output] {sla_str}")
 
     issue = f"Order #{order_id} ('{item_name}') exception found.\n\n" \
@@ -54,7 +73,6 @@ async def diagnosis_agent(state: LiveAgentState):
             f"⏱️ Matrix Rule: {sla_str}"
 
     alt_warehouses = re.findall(r"Warehouse #(\d+):\s*([1-9]\d*)\s*units", inventory_str)
-
     valid_alternatives = [w_id for w_id, stock in alt_warehouses if int(w_id) != current_warehouse]
 
     if valid_alternatives:

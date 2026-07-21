@@ -1,5 +1,6 @@
 import re
 from graph.state import LiveAgentState
+from action_execution import extract_tool_text
 
 async def action_execution_node(state: LiveAgentState):
     """Node 3: Executes write actions safely by delegating everything to the MCP Tool Server."""
@@ -28,10 +29,12 @@ async def action_execution_node(state: LiveAgentState):
             raise KeyError("Tool 'execute_remediation_write' not found in MCP context.")
 
         # 2. Asynchronously invoke tool via LangChain interface
-        mcp_result = await tools["execute_remediation_write"].ainvoke({
-            "order_id": order_id, 
-            "target_warehouse": target_warehouse
+        mcp_result_raw = await tools["execute_remediation_write"].ainvoke({
+        "order_id": order_id, 
+        "target_warehouse": target_warehouse
         })
+
+        mcp_result = extract_tool_text(mcp_result_raw)
         
         print(f"   ↳ [MCP Server Feedback] {mcp_result}")
         return {"action_execute": True}
