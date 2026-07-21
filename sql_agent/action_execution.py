@@ -1,6 +1,6 @@
 import re
 from graph.state import LiveAgentState
-from action_execution import extract_tool_text
+from sql_agent.diagnosis import extract_tool_text
 from context import mcp_context
 
 async def action_execution_node(state: LiveAgentState):
