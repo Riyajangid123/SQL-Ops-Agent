@@ -14,7 +14,7 @@ from langgraph.errors import GraphInterrupt
 from graph.workflow import agent_brain
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from context import mcp_context
+
 
 MCP_CONFIG = {
     "remediation_server": {
@@ -23,6 +23,8 @@ MCP_CONFIG = {
         "args": ["mcp_server.py"]
     }
 }
+
+mcp_context={}
 
 def ensure_database_exists():
     """Guarantees the target directory and SQLite file exist before any request hits the state machine."""

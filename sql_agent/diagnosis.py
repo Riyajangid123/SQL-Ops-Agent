@@ -1,14 +1,14 @@
-# sql_agent/diagnosis.py
 import re
 from graph.state import LiveAgentState
-from context import mcp_context
+
 
 async def diagnosis_agent(state: LiveAgentState):
     print("\n[Node 1] Dynamically diagnosing operational database incident via MCP...")
 
+    from main import mcp_context
+
     tools_list = mcp_context.get("tools", [])
     
-    # 🔍 Diagnostic log to see exactly what tools are present at runtime
     print(f" ↳ [Debug] Available tools in mcp_context: {[getattr(t, 'name', str(t)) for t in tools_list]}")
 
     if not tools_list:
