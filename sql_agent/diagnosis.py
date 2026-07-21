@@ -1,22 +1,29 @@
+# sql_agent/diagnosis.py
 import re
-import json
 from graph.state import LiveAgentState
 from context import mcp_context
 
 async def diagnosis_agent(state: LiveAgentState):
-    """Node 1: Evaluates operational database incidents dynamically by calling external MCP tools."""
     print("\n[Node 1] Dynamically diagnosing operational database incident via MCP...")
 
-    # 1. Convert the MCP tools list into a lookup dictionary
-    tools = {t.name: t for t in mcp_context.get("tools", [])}
+    tools_list = mcp_context.get("tools", [])
+    
+    # 🔍 Diagnostic log to see exactly what tools are present at runtime
+    print(f" ↳ [Debug] Available tools in mcp_context: {[getattr(t, 'name', str(t)) for t in tools_list]}")
+
+    if not tools_list:
+        raise RuntimeError("mcp_context['tools'] is empty! The MCP Client lifespan context has not initialized tools yet.")
+
+    tools = {t.name: t for t in tools_list}
+
+    fetch_tool = tools.get("fetch_order_details") or next((t for t in tools_list if "fetch_order_details" in t.name), None)
+
+    if not fetch_tool:
+        raise KeyError(f"Tool 'fetch_order_details' not found. Registered tools: {list(tools.keys())}")
 
     order_id = state.get("order_id")
-
-    # 2. Invoke 'fetch_order_details' via ainvoke
-    if "fetch_order_details" not in tools:
-        raise KeyError("Tool 'fetch_order_details' not found in MCP context.")
-        
-    order_info_str = await tools["fetch_order_details"].ainvoke({"order_id": order_id})
+    
+    order_info_str = await fetch_tool.ainvoke({"order_id": order_id})
     print(f"   ↳ [MCP Output] {order_info_str}")
 
     if "not found" in order_info_str.lower() or "error" in order_info_str.lower():

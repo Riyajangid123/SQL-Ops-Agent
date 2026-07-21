@@ -11,9 +11,8 @@ from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 
 from langgraph.types import Command
 from langgraph.errors import GraphInterrupt
-from graph.workflow import agent_brain 
+from graph.workflow import agent_brain
 
-# High-level clean MCP adapter
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from context import mcp_context
 
