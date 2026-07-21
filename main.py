@@ -19,7 +19,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 MCP_CONFIG = {
     "remediation_server": {
         "transport": "stdio",
-        "command": "python",
+        "command": "python3",  
         "args": ["mcp_server.py"]
     }
 }
@@ -89,28 +89,33 @@ def ensure_database_exists():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Manages the application lifecycle, database generation, and boots the unified Multi-Server MCP client."""
     print("\n[Lifespan] Initializing system environments...")
     ensure_database_exists()
 
-    print("[Lifespan] Establishing Model Context Protocol (MCP) multi-server client tunnel...")
+    print("[Lifespan] Booting MultiServerMCPClient...")
+    
+    # 1. Instantiate client directly
+    client = MultiServerMCPClient(MCP_CONFIG)
+    
     try:
-        async with MultiServerMCPClient(MCP_CONFIG) as client:
-            print("⚡ [Lifespan] MultiServerMCPClient connected and handshakes initialized.")
-            
-
-            langchain_mcp_tools = await client.get_tools()
-            mcp_context["tools"] = langchain_mcp_tools
-            
-            print(f"[Lifespan] Successfully bound {len(langchain_mcp_tools)} remote MCP tools dynamically.")
-            
-            yield
-            
-    except Exception as mcp_err:
-        print(f"[Lifespan] Multi-Server MCP setup failed: {str(mcp_err)}")
+        # 2. Enter client context explicitly
+        await client.__aenter__()
+        
+        # 3. Retrieve tools dynamically
+        tools = await client.get_tools()
+        mcp_context["tools"] = tools
+        print(f"⚡ [Lifespan] Successfully loaded {len(tools)} tools into mcp_context!")
+        
+        # Server handles HTTP requests here...
+        yield
+        
+    except Exception as e:
+        print(f"❌ [Lifespan Error] MCP Initialization failed: {str(e)}")
         mcp_context["tools"] = []
         yield
-
+    finally:
+        print("[Lifespan] Closing MCP Client sessions...")
+        await client.__aexit__(None, None, None)
 
 app = FastAPI(lifespan=lifespan)
 
