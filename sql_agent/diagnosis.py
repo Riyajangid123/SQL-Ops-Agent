@@ -1,8 +1,7 @@
 import re
 import json
 from graph.state import LiveAgentState
-
-from main import mcp_context
+from context import mcp_context
 
 async def diagnosis_agent(state: LiveAgentState):
     """Node 1: Evaluates operational database incidents dynamically by calling external MCP tools."""

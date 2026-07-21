@@ -15,8 +15,7 @@ from graph.workflow import agent_brain
 
 # High-level clean MCP adapter
 from langchain_mcp_adapters.client import MultiServerMCPClient
-
-mcp_context = {}
+from context import mcp_context
 
 MCP_CONFIG = {
     "remediation_server": {
