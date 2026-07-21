@@ -12,7 +12,7 @@ from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from langgraph.types import Command
 from langgraph.errors import GraphInterrupt
 from graph.workflow import agent_brain
-
+from context import mcp_context
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 
@@ -23,8 +23,6 @@ MCP_CONFIG = {
         "args": ["mcp_server.py"]
     }
 }
-
-mcp_context={}
 
 def ensure_database_exists():
     """Guarantees the target directory and SQLite file exist before any request hits the state machine."""

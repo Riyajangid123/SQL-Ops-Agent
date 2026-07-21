@@ -1,12 +1,12 @@
 import re
 from graph.state import LiveAgentState
 from action_execution import extract_tool_text
+from context import mcp_context
 
 async def action_execution_node(state: LiveAgentState):
     """Node 3: Executes write actions safely by delegating everything to the MCP Tool Server."""
     print("\n⚡ [Node 3] Evaluating user response and modifying backend context...")
 
-    from main import mcp_context
 
     human_choice = state.get("human_decision") or state.get("status")
 

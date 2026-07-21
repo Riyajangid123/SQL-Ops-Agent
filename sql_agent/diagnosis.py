@@ -1,5 +1,6 @@
 import re
 from graph.state import LiveAgentState
+from context import mcp_context
 
 def extract_tool_text(result) -> str:
     """Normalizes MCP tool outputs (string or list of content blocks) into a plain string."""
@@ -23,8 +24,6 @@ def extract_tool_text(result) -> str:
 async def diagnosis_agent(state: LiveAgentState):
     """Node 1: Evaluates operational database incidents dynamically by calling external MCP tools."""
     print("\n[Node 1] Dynamically diagnosing operational database incident via MCP...")
-
-    from main import mcp_context
 
     tools_list = mcp_context.get("tools", [])
     if not tools_list:
