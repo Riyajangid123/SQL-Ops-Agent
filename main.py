@@ -94,30 +94,28 @@ async def lifespan(app: FastAPI):
 
     print("[Lifespan] Booting MultiServerMCPClient...")
     
-    # 1. Instantiate client directly
-    client = MultiServerMCPClient(MCP_CONFIG)
-    
     try:
-        # 2. Enter client context explicitly
-        await client.__aenter__()
+        client = MultiServerMCPClient(MCP_CONFIG)
         
-        # 3. Retrieve tools dynamically
+        # 2. Fetch tools directly using the new API
         tools = await client.get_tools()
         mcp_context["tools"] = tools
-        print(f"⚡ [Lifespan] Successfully loaded {len(tools)} tools into mcp_context!")
         
-        # Server handles HTTP requests here...
+        print(f"⚡ [Lifespan] Successfully bound {len(tools)} remote MCP tools dynamically.")
+        
+
         yield
+
+
         
     except Exception as e:
         print(f"❌ [Lifespan Error] MCP Initialization failed: {str(e)}")
         mcp_context["tools"] = []
         yield
-    finally:
-        print("[Lifespan] Closing MCP Client sessions...")
-        await client.__aexit__(None, None, None)
+
 
 app = FastAPI(lifespan=lifespan)
+
 
 slack_app = AsyncApp(
     token=os.environ.get("SLACK_BOT_TOKEN"),
