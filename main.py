@@ -58,24 +58,27 @@ def ensure_database_exists():
                 );
             """)
             
-            cursor.execute("INSERT OR IGNORE INTO orders VALUES (4092, 'Alice Smith', 'Limbo', 1, 'Premium Shoes');")
             cursor.execute("""
-                INSERT OR IGNORE INTO orders (order_id, status, warehouse_id, item_name) 
+                INSERT OR IGNORE INTO orders (order_id, customer_name, status, warehouse_id, item_name) 
                 VALUES 
-                    (1001, 'Stuck', 1, 'Premium Shoes'),
-                    (1002, 'Stuck', 2, 'Wireless Headphones'),
-                    (1003, 'Processing', 1, 'Premium Shoes'),
-                    (1004, 'Stuck', 3, 'Wireless Headphones');
+                    (1001, 'Bob Marley', 'Stuck', 1, 'Premium Shoes'),
+                    (1002, 'Sarah Connor', 'Stuck', 2, 'Wireless Headphones'),
+                    (1003, 'John Doe', 'Processing', 1, 'Premium Shoes'),
+                    (1004, 'Bruce Wayne', 'Stuck', 3, 'Wireless Headphones'),
+                    (4092, 'Alice Smith', 'Limbo', 1, 'Premium Shoes');
             """)
+
             cursor.execute("""
                 INSERT OR IGNORE INTO inventory (item_name, warehouse_id, stock_count)
                 VALUES 
                     ('Premium Shoes', 1, 0),
                     ('Premium Shoes', 2, 50),
                     ('Premium Shoes', 3, 10),
+                    ('Wireless Headphones', 1, 35),
                     ('Wireless Headphones', 2, 0),
-                    ('Wireless Headphones', 1, 35);
+                    ('Wireless Headphones', 3, 20);
             """)
+
             conn.commit()
             conn.close()
             print(" [Database Setup] Seeding complete. Persistent schema active.")
